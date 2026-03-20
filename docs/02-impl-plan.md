@@ -220,6 +220,54 @@ ssotyle/
 - `"filter": {"$type": "color"}` でトークンを絞り込める
 - `platforms` に複数のプラットフォームを定義して一括ビルドできる
 
+### Phase 8: YAML / TOML パーサーの追加
+
+Phase 1 で作った `Parser` トレイトの抽象化を活かし、入力フォーマットを拡充する。
+
+ゴール:
+
+- `YamlParser` を実装し、`.yaml` / `.yml` ファイルをトークンソースとして使える
+- `TomlParser` を実装し、`.toml` ファイルをトークンソースとして使える
+- `source: ["tokens/**/*.yaml"]` のように異なるフォーマットを混在させられる
+
+追加クレート:
+
+- `serde_yaml` — YAML パース
+- `toml` — TOML パース
+
+### Phase 9: npm パッケージ配布
+
+Rust バイナリを npm 経由でインストールできるようにする。
+esbuild、Biome、oxlint などが採用しているプラットフォーム別バイナリ方式に従う。
+
+```mermaid
+graph TD
+    A["npm install ssotyle"] --> B["@ssotyle/cli\n(JS ラッパー)"]
+    B -->|optionalDependencies| C["@ssotyle/darwin-arm64"]
+    B -->|optionalDependencies| D["@ssotyle/darwin-x64"]
+    B -->|optionalDependencies| E["@ssotyle/linux-x64"]
+    B -->|optionalDependencies| F["@ssotyle/win32-x64"]
+```
+
+仕組み:
+
+- `@ssotyle/cli` がメインパッケージ。薄い JS ラッパーが OS/arch を判定し、対応するバイナリを実行する
+- `@ssotyle/darwin-arm64` 等はプラットフォーム別パッケージ。ビルド済みバイナリだけを含む
+- npm の `optionalDependencies` により、現在の OS に合うパッケージだけがインストールされる
+- ユーザーから見ると通常の npm パッケージと同じ体験
+
+ゴール:
+
+- GitHub Actions でクロスコンパイル (macOS arm64/x64、Linux x64、Windows x64)
+- `npm install ssotyle && npx ssotyle build` で動作する
+- `cargo install ssotyle` での直接インストールも引き続きサポート
+
+必要な作業:
+
+- `npm/` ディレクトリにパッケージ群のテンプレートを作成
+- GitHub Actions ワークフローでクロスコンパイル + npm publish を自動化
+- JS ラッパースクリプトの実装 (バイナリの検出と実行)
+
 ## Style Dictionary との対応関係
 
 オリジナルの JavaScript 実装と ssotyle の Rust 実装の対応表。
