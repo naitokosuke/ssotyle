@@ -16,7 +16,15 @@
 cargo run -- tokens/colors.json
 ```
 
-を実行すると、トークンファイルの中身が整形表示される。
+を実行すると、以下のようにトークンが一覧表示される。
+
+```
+  colors.black = "#000000"
+  colors.white = "#ffffff"
+  colors.brand = "{colors.orange.500}"
+  colors.orange.500 = "#ed8936"
+  colors.orange.700 = "#c05621"
+```
 
 ## 準備
 
@@ -67,7 +75,10 @@ cargo add serde --features derive
 cargo add serde_json
 ```
 
-## 解説
+## 知識ガイド
+
+各ステップで必要になる知識を紹介する。
+コード例は最小限にとどめているので、自分で組み合わせて実装してみよう。
 
 ### serde とは
 
@@ -94,51 +105,34 @@ graph LR
 JSON の構造が事前にわからない場合、`serde_json::Value` で動的にパースできる。
 デザイントークンはユーザーが自由にネストを定義するため、この動的パースが適している。
 
-```rust
-use serde_json::Value;
+`Value` は以下の variant を持つ enum である:
 
-// Value は JSON の各型に対応する enum
-// Value::Null
-// Value::Bool(bool)
-// Value::Number(Number)
-// Value::String(String)
-// Value::Array(Vec<Value>)
-// Value::Object(Map<String, Value>)
-```
+- `Value::Null`
+- `Value::Bool(bool)`
+- `Value::Number(Number)`
+- `Value::String(String)`
+- `Value::Array(Vec<Value>)`
+- `Value::Object(Map<String, Value>)`
+
+便利メソッド:
+
+- `value.as_object()` — `Option<&Map<String, Value>>` を返す
+- `obj.get("key")` — `Option<&Value>` を返す
 
 ### std::fs::read_to_string
 
-ファイルの中身を `String` として読み込む関数。
-戻り値は `Result<String, std::io::Error>` である。
-
-```rust
-use std::fs;
-
-// 成功すれば String、失敗すれば io::Error が返る
-let content: Result<String, std::io::Error> = fs::read_to_string("tokens/colors.json");
-```
+ファイルの中身を `String` として読み込む。戻り値は `Result<String, std::io::Error>` である。
 
 ### std::env::args
 
-コマンドライン引数を取得する。
+コマンドライン引数を取得する。`cargo run -- tokens/colors.json` と実行した場合:
 
-```sh
-cargo run -- tokens/colors.json
-```
-
-と実行した場合:
-
-```rust
-use std::env;
-
-let args: Vec<String> = env::args().collect();
-// args[0] = "target/debug/ssotyle"  (実行ファイルパス)
-// args[1] = "tokens/colors.json"    (ユーザーが渡した引数)
-```
+- `args[0]` = 実行ファイルパス
+- `args[1]` = `"tokens/colors.json"` (ユーザーが渡した引数)
 
 ### ? 演算子と main の戻り値
 
-`main` 関数の戻り値を `Result` にすると、`?` 演算子でエラーを簡潔に処理できる。
+`main` の戻り値を `Result` にすると、`?` 演算子でエラーを簡潔に処理できる。
 
 ```rust
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -148,145 +142,85 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 `Box<dyn std::error::Error>` は「あらゆるエラー型を受け取れる箱」である。
-Phase 0 ではこれで十分。後の Phase で独自エラー型 (`thiserror`) に置き換える。
 
-## 実装手順
+### 再帰と可変借用
 
-### Step 0: コマンドライン引数でファイルパスを受け取る
+`Vec` を `&mut` で渡すと、呼び出し先で `push` / `pop` して状態を管理できる。
+再帰関数でパスを積み上げていくのに使う。
 
 ```rust
-use std::env;
-
-fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Usage: ssotyle <file>");
-        std::process::exit(1);
-    }
-
-    let file_path = &args[1];
-    println!("File: {}", file_path);
+fn walk(path: &mut Vec<String>) {
+    path.push("child".to_string());
+    // ... 再帰呼び出し ...
+    path.pop();  // 戻るときに元に戻す
 }
 ```
 
-`eprintln!` は標準エラー出力に書き出す。ユーザー向けのエラーメッセージに使う。
+## 課題
 
-`cargo run` で実行するときは `--` の後に引数を渡す:
+### 課題 0: コマンドライン引数でファイルパスを受け取る
+
+`std::env::args` を使い、引数が足りないときはエラーメッセージを表示して終了するプログラムを書こう。
+
+確認:
+
+```sh
+cargo run                        # → "Usage: ssotyle <file>" と表示されること
+cargo run -- tokens/colors.json  # → ファイルパスが表示されること
+```
+
+ヒント: `eprintln!` は標準エラー出力に書き出す。`std::process::exit(1)` で異常終了できる。
+
+### 課題 1: ファイルを読み込んで表示する
+
+引数で受け取ったパスのファイルを読み込み、中身をそのまま表示しよう。
+
+確認:
+
+```sh
+cargo run -- tokens/colors.json  # → JSON の中身がそのまま表示されること
+```
+
+ヒント: `std::fs::read_to_string` と `?` 演算子を使う。`main` の戻り値の型を変える必要がある。
+
+### 課題 2: JSON としてパースして整形表示する
+
+読み込んだ文字列を `serde_json::Value` にパースし、整形表示しよう。
+
+確認:
+
+```sh
+cargo run -- tokens/colors.json  # → インデント付きで表示されること
+```
+
+ヒント: `serde_json::from_str` でパースできる。`println!("{:#}", value)` で整形表示できる。
+
+### 課題 3: トークンを再帰的に探索して一覧表示する
+
+ここが本題。ネストされた JSON を再帰的に走査し、`$value` を持つノードをトークンとして表示する関数を作ろう。
+
+以下のシグネチャの関数を実装する:
+
+```rust
+fn visit_tokens(value: &Value, path: &mut Vec<String>) {
+    // ここを実装する
+}
+```
+
+考えるポイント:
+
+- `value` がオブジェクトでなければ何もしない
+- オブジェクトに `$value` キーがあれば、それはトークン。`path` を `.` で結合して表示する
+- `$value` がなければ、各キーについて再帰的に探索する
+- `$` で始まるキー (`$type` 等) はメタデータなのでスキップする
+
+確認:
 
 ```sh
 cargo run -- tokens/colors.json
 ```
 
-`--` がないと cargo 自身のオプションとして解釈されてしまう。
-
-### Step 1: ファイルを読み込む
-
-```rust
-use std::env;
-use std::fs;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Usage: ssotyle <file>");
-        std::process::exit(1);
-    }
-
-    let file_path = &args[1];
-    let content = fs::read_to_string(file_path)?;
-    println!("{}", content);
-
-    Ok(())
-}
-```
-
-この時点で `cargo run -- tokens/colors.json` を実行すると、ファイルの中身がそのまま表示される。
-
-### Step 2: JSON としてパースする
-
-```rust
-use serde_json::Value;
-use std::env;
-use std::fs;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Usage: ssotyle <file>");
-        std::process::exit(1);
-    }
-
-    let file_path = &args[1];
-    let content = fs::read_to_string(file_path)?;
-    let value: Value = serde_json::from_str(&content)?;
-
-    println!("{:#}", value);
-
-    Ok(())
-}
-```
-
-- `serde_json::from_str` — 文字列を JSON としてパースする。失敗すると `serde_json::Error` を返す
-- `{:#}` — `Value` の `Display` 実装により整形 (pretty-print) 表示される
-
-### Step 3: トークンを探索して一覧表示する
-
-ネストされた JSON を再帰的に走査し、`$value` を持つノードをトークンとして表示する。
-
-```rust
-use serde_json::Value;
-use std::env;
-use std::fs;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Usage: ssotyle <file>");
-        std::process::exit(1);
-    }
-
-    let file_path = &args[1];
-    let content = fs::read_to_string(file_path)?;
-    let value: Value = serde_json::from_str(&content)?;
-
-    let mut path: Vec<String> = Vec::new();
-    visit_tokens(&value, &mut path);
-
-    Ok(())
-}
-
-fn visit_tokens(value: &Value, path: &mut Vec<String>) {
-    // Value がオブジェクトの場合のみ処理する
-    let obj = match value.as_object() {
-        Some(obj) => obj,
-        None => return,
-    };
-
-    // $value キーがあればトークンとして表示
-    if let Some(token_value) = obj.get("$value") {
-        let path_str = path.join(".");
-        println!("  {path_str} = {token_value}");
-        return;
-    }
-
-    // $value がなければ子ノードを再帰的に探索
-    for (key, child) in obj {
-        // $ で始まるキーはメタデータなのでスキップ
-        if key.starts_with('$') {
-            continue;
-        }
-        path.push(key.clone());
-        visit_tokens(child, path);
-        path.pop();
-    }
-}
-```
-
-実行結果:
+期待する出力:
 
 ```
   colors.black = "#000000"
@@ -296,17 +230,10 @@ fn visit_tokens(value: &Value, path: &mut Vec<String>) {
   colors.orange.700 = "#c05621"
 ```
 
-ポイント:
+## チャレンジ課題
 
-- `&Value` — 所有権を移動せず、借用 (参照) で渡している
-- `&mut Vec<String>` — パスを可変借用で渡し、`push` / `pop` で状態を管理する。これにより再帰の各段階で現在のパスを追跡できる
-- `match` と `if let` — Rust のパターンマッチ。`Option` や `Value` から中身を安全に取り出す
-- `key.starts_with('$')` — `$type` や `$description` などのメタデータをスキップ
+Phase 0 の理解を深めるための追加課題。必須ではない。
 
-## 演習
-
-Phase 0 の理解を深めるための課題。
-
-- `$type` の情報も一緒に表示してみよう。`$type` はグループレベルで定義され、子トークンに継承される。`visit_tokens` 関数に `current_type: Option<&str>` 引数を追加して、型の伝播を実装できるか試してみよう
-- 存在しないファイルパスを渡したとき、どんなエラーメッセージが表示されるか確認しよう。また、JSON として不正な内容のファイルを渡した場合はどうなるか試してみよう
+- `$type` の情報も一緒に表示してみよう。`$type` はグループレベルで定義され、子トークンに継承される。`visit_tokens` に `current_type: Option<&str>` 引数を追加して、型の伝播を実装できるか試してみよう
+- 存在しないファイルパスを渡したとき、どんなエラーメッセージが表示されるか確認しよう。JSON として不正な内容のファイルを渡した場合はどうなるか
 - `tokens/dimensions.json` を新たに作成し、2 つのファイルを順番に読み込んで両方のトークンを表示するプログラムに改造してみよう (Phase 1 への布石)
