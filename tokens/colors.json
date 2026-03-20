@@ -1,0 +1,22 @@
+{
+  "colors": {
+    "$type": "color",
+    "black": {
+      "$value": "#000000"
+    },
+    "white": {
+      "$value": "#ffffff"
+    },
+    "brand": {
+      "$value": "{colors.orange.500}"
+    },
+    "orange": {
+      "500": {
+        "$value": "#ed8936"
+      },
+      "700": {
+        "$value": "#c05621"
+      }
+    }
+  }
+}
