@@ -4,11 +4,12 @@
 
 ## この章で学ぶこと
 
-- `Cargo.toml` への依存クレートの追加
-- `serde` と `serde_json` による JSON パース
 - `std::fs` によるファイル読み込み
 - `Result` によるエラーハンドリング
 - コマンドライン引数の取得 (`std::env::args`)
+- 自作 JSON パーサーの実装 (文字列の走査、再帰下降パーサー)
+- enum を使った JSON 値の表現
+- トレイトによるパーサーの抽象化
 
 ## ゴール
 
@@ -58,66 +59,89 @@ cargo run -- tokens/colors.json
 }
 ```
 
-### 依存クレートの追加
+### 依存クレートについて
 
-`Cargo.toml` に `serde` と `serde_json` を追加する。
+Phase 0 では外部クレートを使わず、標準ライブラリだけで JSON パーサーを自作する。
+`Cargo.toml` の `[dependencies]` は空のままで良い。
 
-```toml
-[dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-```
-
-`cargo add` コマンドでも追加できる:
-
-```sh
-cargo add serde --features derive
-cargo add serde_json
-```
+後のフェーズで `serde_json` に差し替える。
+トレイトで抽象化しておけば、パーサーの実装を自由に入れ替えられる。
 
 ## 知識ガイド
 
-各ステップで必要になる知識を紹介する。
-コード例は最小限にとどめているので、自分で組み合わせて実装してみよう。
+### JSON の構文
 
-### serde とは
+JSON パーサーを書くには、JSON の構文規則を知る必要がある。
+デザイントークンで使う範囲に絞ると、以下の要素だけ対応すればよい。
 
-`serde` は Rust のシリアライズ/デシリアライズフレームワークである。
-「データ形式」と「Rust の型」の間の変換を担当する。
+| 要素 | 例 |
+|------|------|
+| 文字列 | `"hello"` |
+| 数値 | `42`, `3.14` |
+| 真偽値 | `true`, `false` |
+| null | `null` |
+| 配列 | `[1, 2, 3]` |
+| オブジェクト | `{"key": "value"}` |
 
-```mermaid
-graph LR
-    A["JSON 文字列"] -->|デシリアライズ| B["Rust の型"]
-    B -->|シリアライズ| A
+オブジェクトの構文:
+
+```
+{ "key1": value1, "key2": value2 }
 ```
 
-`serde` 本体はフレームワークだけを提供し、具体的なフォーマットは別クレートが担当する。
-この分離が、Phase 8 で YAML / TOML に拡張できる理由でもある。
+- `{` で始まる
+- `"key": value` のペアが `,` で区切られる
+- `}` で終わる
+- ホワイトスペース (空白、改行、タブ) は無視される
 
-| クレート | フォーマット |
-|----------|------------|
-| `serde_json` | JSON |
-| `serde_yaml` | YAML |
-| `toml` | TOML |
+### enum で JSON 値を表現する
 
-### serde_json::Value
+Rust の enum はデータを持てる。これを使って JSON の値を表現できる。
 
-JSON の構造が事前にわからない場合、`serde_json::Value` で動的にパースできる。
-デザイントークンはユーザーが自由にネストを定義するため、この動的パースが適している。
+```rust
+enum JsonValue {
+    Null,
+    Bool(bool),
+    Number(f64),
+    String(String),
+    Array(Vec<JsonValue>),
+    Object(Vec<(String, JsonValue)>),  // キーと値のペアのリスト
+}
+```
 
-`Value` は以下の variant を持つ enum である:
+これが自作パーサーの出力となる内部表現である。
+`Object` に `HashMap` ではなく `Vec<(String, JsonValue)>` を使うと、キーの順序が保持される。
 
-- `Value::Null`
-- `Value::Bool(bool)`
-- `Value::Number(Number)`
-- `Value::String(String)`
-- `Value::Array(Vec<Value>)`
-- `Value::Object(Map<String, Value>)`
+### 再帰下降パーサーとは
 
-便利メソッド:
+JSON パーサーは「再帰下降パーサー」で実装するのが最も自然である。
+各 JSON 要素に対応する関数を作り、互いに呼び合う構造になる。
 
-- `value.as_object()` — `Option<&Map<String, Value>>` を返す
-- `obj.get("key")` — `Option<&Value>` を返す
+```mermaid
+graph TD
+    A["parse_value"] --> B["parse_string"]
+    A --> C["parse_number"]
+    A --> D["parse_object"]
+    A --> E["parse_array"]
+    A --> F["parse_bool / parse_null"]
+    D -->|各 value を| A
+    E -->|各要素を| A
+```
+
+パーサーは文字列の「現在位置」を進めながら読み取る。
+
+```rust
+struct Parser {
+    input: Vec<char>,  // 入力文字列
+    pos: usize,        // 現在位置
+}
+```
+
+基本的なパターン:
+
+- 現在の文字を見て (`input[pos]`)、何をパースするか決める
+- パースしたら `pos` を進める
+- 予期しない文字に出会ったらエラーを返す
 
 ### std::fs::read_to_string
 
@@ -183,26 +207,62 @@ cargo run -- tokens/colors.json  # → JSON の中身がそのまま表示され
 
 ヒント: `std::fs::read_to_string` と `?` 演算子を使う。`main` の戻り値の型を変える必要がある。
 
-### 課題 2: JSON としてパースして整形表示する
+### 課題 2: JsonValue enum を定義する
 
-読み込んだ文字列を `serde_json::Value` にパースし、整形表示しよう。
+JSON の値を表す `JsonValue` enum を定義しよう。
+
+対応すべき型:
+
+- null
+- 真偽値
+- 数値 (f64)
+- 文字列
+- 配列
+- オブジェクト
+
+この時点ではまだ使わなくて良い。定義だけで OK。
+
+### 課題 3: 簡易 JSON パーサーを作る
+
+ここが本題。`Parser` 構造体を作り、JSON 文字列を `JsonValue` に変換する。
+
+まず以下のヘルパーメソッドを実装する:
+
+- `skip_whitespace` — 空白・改行・タブを読み飛ばす
+- `peek` — 現在位置の文字を返す (位置は進めない)
+- `advance` — 現在位置を 1 つ進める
+
+次に、各 JSON 要素のパース関数を実装する。推奨する順序:
+
+- `parse_string` — `"` で始まり `"` で終わる文字列を読む
+- `parse_number` — 数字と `.` を読んで `f64` に変換する
+- `parse_null` — `null` の 4 文字を読む
+- `parse_bool` — `true` または `false` を読む
+- `parse_array` — `[` で始まり、`,` 区切りで `parse_value` を呼び、`]` で終わる
+- `parse_object` — `{` で始まり、`"key": value` のペアを読み、`}` で終わる
+- `parse_value` — 最初の文字を見て上記のどれかを呼び分ける
 
 確認:
 
-```sh
-cargo run -- tokens/colors.json  # → インデント付きで表示されること
+```rust
+let input = r#"{"name": "test", "value": 42}"#;
+// パースして JsonValue::Object が得られること
 ```
 
-ヒント: `serde_json::from_str` でパースできる。`println!("{:#}", value)` で整形表示できる。
+ヒント:
 
-### 課題 3: トークンを再帰的に探索して一覧表示する
+- `parse_value` は `peek()` の結果で分岐する。`"` なら文字列、`{` ならオブジェクト、`[` なら配列、`t`/`f` なら真偽値、`n` なら null、数字なら数値
+- エラーは `Result<JsonValue, String>` で返すのが最も簡単。エラーメッセージに現在位置を含めると、デバッグしやすい
+- エスケープシーケンス (`\"`, `\\` 等) は最初は無視して良い。デザイントークンでは滅多に出てこない
 
-ここが本題。ネストされた JSON を再帰的に走査し、`$value` を持つノードをトークンとして表示する関数を作ろう。
+### 課題 4: トークンを再帰的に探索して一覧表示する
+
+パースした `JsonValue` を再帰的に走査し、`$value` を持つノードをトークンとして表示する関数を作ろう。
 
 以下のシグネチャの関数を実装する:
 
 ```rust
-fn visit_tokens(value: &Value, path: &mut Vec<String>) {
+fn visit_tokens(value: &JsonValue, path: &mut Vec<String>) {
     // ここを実装する
 }
 ```
@@ -237,3 +297,26 @@ Phase 0 の理解を深めるための追加課題。必須ではない。
 - `$type` の情報も一緒に表示してみよう。`$type` はグループレベルで定義され、子トークンに継承される。`visit_tokens` に `current_type: Option<&str>` 引数を追加して、型の伝播を実装できるか試してみよう
 - 存在しないファイルパスを渡したとき、どんなエラーメッセージが表示されるか確認しよう。JSON として不正な内容のファイルを渡した場合はどうなるか
 - `tokens/dimensions.json` を新たに作成し、2 つのファイルを順番に読み込んで両方のトークンを表示するプログラムに改造してみよう (Phase 1 への布石)
+
+## 次のステップへ
+
+Phase 0 で自作した `JsonValue` と `Parser` は、Phase 1 で `Parser` トレイトとして抽象化する。
+
+```rust
+trait TokenParser {
+    fn extensions(&self) -> &[&str];
+    fn parse(&self, content: &[u8]) -> Result<JsonValue, SsotyleError>;
+}
+```
+
+こうすることで、自作パーサーと serde ベースのパーサーを自由に差し替えられるようになる。
+
+```mermaid
+graph TD
+    T["TokenParser trait"] --> H["HandWrittenParser\n(Phase 0 で作ったもの)"]
+    T --> S["SerdeJsonParser\n(serde_json ベース)"]
+    T --> Y["YamlParser\n(Phase 8 で追加)"]
+    H --> V["JsonValue"]
+    S --> V
+    Y --> V
+```
