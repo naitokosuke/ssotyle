@@ -1,12 +1,14 @@
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     match args.as_slice() {
         [_, filepath] => {
-            println!("{}", filepath);
+            let content = std::fs::read_to_string(filepath)?;
+            println!("{}, {}", filepath, content);
         }
         _ => {
             eprintln!("Usage: ssotyle <file>");
             std::process::exit(1);
         }
     }
+    Ok(())
 }
