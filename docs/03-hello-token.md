@@ -324,6 +324,73 @@ cargo run -- tokens/colors.json  # → JSON の中身がそのまま表示され
 
 ヒント: `std::fs::read_to_string` と `?` 演算子を使う。`main` の戻り値の型を変える必要がある。
 
+<details>
+<summary>課題 1 の解説</summary>
+
+### 実装例
+
+```rust
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = std::env::args().collect();
+    match args.as_slice() {
+        [_, filepath] => {
+            let content = std::fs::read_to_string(filepath)?;
+            println!("{}", content);
+        }
+        _ => {
+            eprintln!("Usage: ssotyle <file>");
+            std::process::exit(1);
+        }
+    }
+    Ok(())
+}
+```
+
+### `-> Result<(), Box<dyn std::error::Error>>`
+
+関数の戻り値の型。課題 0 の `main` は何も返さなかったが、`?` 演算子を使うために `Result` を返す必要がある。
+
+- `Result<(), Box<dyn std::error::Error>>` — 成功時は `()` (何もない)、失敗時はエラー
+- `Box<dyn std::error::Error>` — あらゆる種類のエラーを入れられる箱。`std::io::Error` (ファイル読み込み失敗) なども受け取れる
+
+### `std::fs::read_to_string(filepath)`
+
+ファイルの中身を `String` として読み込む。戻り値は `Result<String, std::io::Error>`。
+
+- ファイルが存在すれば `Ok(String)` を返す
+- ファイルが見つからない、読み取り権限がないなどの場合は `Err(std::io::Error)` を返す
+
+### `?` 演算子
+
+`Result` を返す式の末尾に `?` を付けると:
+
+- `Ok(値)` なら → 値を取り出して処理を続ける
+- `Err(エラー)` なら → 関数から即座に `Err(エラー)` を返す
+
+```rust
+let content = std::fs::read_to_string(filepath)?;
+```
+
+これは以下と同じ意味:
+
+```rust
+let content = match std::fs::read_to_string(filepath) {
+    Ok(s) => s,
+    Err(e) => return Err(e.into()),
+};
+```
+
+`?` のおかげで 1 行で書ける。
+
+### `Ok(())`
+
+関数の最後に書く。「正常に終了した」ことを表す。
+`Result` を返す関数なので、成功時も明示的に `Ok` で包む必要がある。
+
+`()` は Rust の「何もない値」(ユニット型)。他の言語の `void` に近い。
+
+</details>
+
 ### 課題 2: JsonValue enum を定義する
 
 JSON の値を表す `JsonValue` enum を定義しよう。
