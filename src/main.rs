@@ -37,4 +37,13 @@ impl Parser {
     fn advance(&mut self) {
         self.pos += 1
     }
+
+    fn skip_whitespace(&mut self) {
+        while let Some(c) = self.peek() {
+            if !c.is_whitespace() {
+                break;
+            }
+            self.advance();
+        }
+    }
 }
