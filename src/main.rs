@@ -33,4 +33,8 @@ impl Parser {
     fn peek(&self) -> Option<char> {
         self.input.get(self.pos).copied()
     }
+
+    fn advance(&mut self) {
+        self.pos += 1
+    }
 }
