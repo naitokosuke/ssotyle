@@ -417,6 +417,105 @@ JSON の値を表す `JsonValue` enum を定義しよう。
 
 この時点ではまだ使わなくて良い。定義だけで OK。
 
+<details>
+<summary>課題 2 の解説</summary>
+
+### 実装例
+
+```rust
+enum JsonValue {
+    Null,
+    Bool(bool),
+    Number(f64),
+    Str(String),
+    Array(Vec<JsonValue>),
+    Object(Vec<(String, JsonValue)>),
+}
+```
+
+### Rust の enum とは
+
+Rust の enum は「この値は A か B か C のどれかである」を表す型。
+他の言語の enum は数値の列挙だけだが、Rust の enum は各 variant がデータを持てる。
+
+```rust
+// 他の言語の enum に近い (データなし)
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+// Rust ならではの enum (データあり)
+enum JsonValue {
+    Null,           // データなし
+    Bool(bool),     // bool を 1 つ持つ
+    Number(f64),    // f64 を 1 つ持つ
+    Str(String),    // String を 1 つ持つ
+    Array(Vec<JsonValue>),              // JsonValue の配列を持つ
+    Object(Vec<(String, JsonValue)>),   // キーと値のペアの配列を持つ
+}
+```
+
+ある時点で `JsonValue` は上記の variant のうち**ちょうど 1 つ**の状態にある。
+文字列であると同時に数値であることはない。
+
+### variant の書き方
+
+```rust
+// データなし
+Null,
+
+// データ 1 つ
+Bool(bool),
+
+// 複数のデータをまとめたいときはタプル
+Object(Vec<(String, JsonValue)>),
+//          ^                ^  タプル: 2 つの値を 1 つにまとめる
+```
+
+`Vec<(String, JsonValue)>` は「`(String, JsonValue)` のタプルを要素とする配列」。
+`Vec<String, JsonValue>` と書くとコンパイルエラーになる。`Vec` は型引数を 1 つしか取れないため。
+
+### variant 名 `Str` について
+
+`String` は標準ライブラリの型名としてすでに使われている。
+variant 名を `String` にすると名前が衝突するため、`Str` にしている。
+
+### 再帰的な型
+
+`Array(Vec<JsonValue>)` は `JsonValue` の中に `JsonValue` が入る再帰構造。
+JSON 自体がネストする構造 (`[1, [2, 3]]` 等) なので、型もそれを反映する。
+
+`Vec` はヒープにデータを置くため、コンパイラがサイズを決定できる。
+もし `Vec` なしで `Array(JsonValue)` と書くと、サイズが無限になりコンパイルエラーになる。
+
+### enum の使い方 (次の課題で使う)
+
+enum の値を作るには `enum名::variant名` と書く:
+
+```rust
+let v1 = JsonValue::Null;
+let v2 = JsonValue::Number(42.0);
+let v3 = JsonValue::Str("hello".to_string());
+```
+
+enum の値を取り出すには `match` を使う:
+
+```rust
+match value {
+    JsonValue::Null => println!("null"),
+    JsonValue::Bool(b) => println!("{}", b),
+    JsonValue::Number(n) => println!("{}", n),
+    JsonValue::Str(s) => println!("{}", s),
+    JsonValue::Array(arr) => println!("配列: {} 要素", arr.len()),
+    JsonValue::Object(obj) => println!("オブジェクト: {} キー", obj.len()),
+}
+```
+
+</details>
+
 ### 課題 3: 簡易 JSON パーサーを作る
 
 ここが本題。`Parser` 構造体を作り、JSON 文字列を `JsonValue` に変換する。
