@@ -17,7 +17,7 @@ enum JsonValue {
     Null,
     Bool(bool),
     Number(f64),
-    String(String),
+    Str(String),
     Array(Vec<JsonValue>),
     Object(Vec<(String, JsonValue)>),
 }
