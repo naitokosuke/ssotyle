@@ -90,6 +90,18 @@ impl Parser {
         todo!()
     }
     fn parse_number(&mut self) -> Result<JsonValue, String> {
-        todo!()
+        let mut chars: Vec<char> = Vec::new();
+        while let Some(c) = self.peek() {
+            match c {
+                '0'..='9' | '.' | '-' => {
+                    chars.push(c);
+                    self.advance();
+                }
+                _ => break,
+            }
+        }
+        let s: String = chars.iter().collect();
+        let n: f64 = s.parse().map_err(|_| format!("Invalid Number: {}", s))?;
+        Ok(JsonValue::Number(n))
     }
 }
