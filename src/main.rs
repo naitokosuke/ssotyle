@@ -201,4 +201,119 @@ mod tests {
         };
         assert!(parser.parse_string().is_err());
     }
+
+    #[test]
+    fn test_parse_number() {
+        let mut parser = Parser {
+            input: "42".chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_number().unwrap(), JsonValue::Number(42.0));
+    }
+
+    #[test]
+    fn test_parse_number_decimal() {
+        let mut parser = Parser {
+            input: "3.14".chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_number().unwrap(), JsonValue::Number(3.14));
+    }
+
+    #[test]
+    fn test_parse_null() {
+        let mut parser = Parser {
+            input: "null".chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_null().unwrap(), JsonValue::Null);
+    }
+
+    #[test]
+    fn test_parse_bool_true() {
+        let mut parser = Parser {
+            input: "true".chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_bool().unwrap(), JsonValue::Bool(true));
+    }
+
+    #[test]
+    fn test_parse_bool_false() {
+        let mut parser = Parser {
+            input: "false".chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_bool().unwrap(), JsonValue::Bool(false));
+    }
+
+    #[test]
+    fn test_parse_array() {
+        let mut parser = Parser {
+            input: "[1, 2, 3]".chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(
+            parser.parse_array().unwrap(),
+            JsonValue::Array(vec![
+                JsonValue::Number(1.0),
+                JsonValue::Number(2.0),
+                JsonValue::Number(3.0),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_parse_array_empty() {
+        let mut parser = Parser {
+            input: "[]".chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_array().unwrap(), JsonValue::Array(vec![]));
+    }
+
+    #[test]
+    fn test_parse_object() {
+        let mut parser = Parser {
+            input: r#"{"name": "test", "value": 42}"#.chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(
+            parser.parse_object().unwrap(),
+            JsonValue::Object(vec![
+                ("name".to_string(), JsonValue::Str("test".to_string())),
+                ("value".to_string(), JsonValue::Number(42.0)),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_parse_object_empty() {
+        let mut parser = Parser {
+            input: "{}".chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_object().unwrap(), JsonValue::Object(vec![]));
+    }
+
+    #[test]
+    fn test_parse_value_nested() {
+        let mut parser = Parser {
+            input: r##"{"colors": {"black": {"$value": "#000000"}}}"##.chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(
+            parser.parse_value().unwrap(),
+            JsonValue::Object(vec![(
+                "colors".to_string(),
+                JsonValue::Object(vec![(
+                    "black".to_string(),
+                    JsonValue::Object(vec![(
+                        "$value".to_string(),
+                        JsonValue::Str("#000000".to_string()),
+                    )]),
+                )]),
+            )])
+        );
+    }
 }
