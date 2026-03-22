@@ -78,8 +78,29 @@ impl Parser {
     }
 
     fn parse_object(&mut self) -> Result<JsonValue, String> {
-        todo!()
+        let mut entries: Vec<(String, JsonValue)> = Vec::new();
+        self.advance();
+
+        loop {
+            self.skip_whitespace();
+            match self.peek() {
+                Some('}') => {
+                    self.advance();
+                    return Ok(JsonValue::Object(entries));
+                }
+                Some(':' | ',') => self.advance(),
+                Some(_) => {
+                    let key = self.parse_string()?;
+                    self.skip_whitespace();
+                    self.advance();
+                    let value = self.parse_value()?;
+                    entries.push((key, value))
+                }
+                None => return Err("Object is not closed".to_string()),
+            }
+        }
     }
+
     fn parse_array(&mut self) -> Result<JsonValue, String> {
         let mut elements: Vec<JsonValue> = Vec::new();
         self.advance();
@@ -91,9 +112,7 @@ impl Parser {
                     self.advance();
                     return Ok(JsonValue::Array(elements));
                 }
-                Some(',') => {
-                    self.advance();
-                }
+                Some(',') => self.advance(),
                 Some(_) => {
                     let value = self.parse_value()?;
                     elements.push(value);
