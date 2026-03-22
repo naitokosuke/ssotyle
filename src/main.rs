@@ -84,7 +84,21 @@ impl Parser {
         todo!()
     }
     fn parse_bool(&mut self) -> Result<JsonValue, String> {
-        todo!()
+        match self.peek() {
+            Some('t') => {
+                for _ in 0..4 {
+                    self.advance();
+                }
+                Ok(JsonValue::Bool(true))
+            }
+            Some('f') => {
+                for _ in 0..5 {
+                    self.advance();
+                }
+                Ok(JsonValue::Bool(false))
+            }
+            _ => Err("Unexpected Character".to_string()),
+        }
     }
     fn parse_null(&mut self) -> Result<JsonValue, String> {
         for _ in 0..4 {
