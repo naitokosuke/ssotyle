@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[derive(Debug, PartialEq)]
 enum JsonValue {
     Null,
     Bool(bool),
@@ -158,5 +159,20 @@ impl Parser {
         let s: String = chars.iter().collect();
         let n: f64 = s.parse().map_err(|_| format!("Invalid Number: {}", s))?;
         Ok(JsonValue::Number(n))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_string() {
+        let mut parser = Parser {
+            input: r#""hello""#.chars().collect(),
+            pos: 0,
+        };
+        let result = parser.parse_string().unwrap();
+        assert_eq!(result, "hello");
     }
 }
