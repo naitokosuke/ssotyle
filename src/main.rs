@@ -81,7 +81,26 @@ impl Parser {
         todo!()
     }
     fn parse_array(&mut self) -> Result<JsonValue, String> {
-        todo!()
+        let mut elements: Vec<JsonValue> = Vec::new();
+        self.advance();
+
+        loop {
+            self.skip_whitespace();
+            match self.peek() {
+                Some(']') => {
+                    self.advance();
+                    return Ok(JsonValue::Array(elements));
+                }
+                Some(',') => {
+                    self.advance();
+                }
+                Some(_) => {
+                    let value = self.parse_value()?;
+                    elements.push(value);
+                }
+                None => return Err("Array is not closed".to_string()),
+            }
+        }
     }
     fn parse_bool(&mut self) -> Result<JsonValue, String> {
         match self.peek() {
