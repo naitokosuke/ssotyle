@@ -87,7 +87,10 @@ impl Parser {
         todo!()
     }
     fn parse_null(&mut self) -> Result<JsonValue, String> {
-        todo!()
+        for _ in 0..4 {
+            self.advance();
+        }
+        Ok(JsonValue::Null)
     }
     fn parse_number(&mut self) -> Result<JsonValue, String> {
         let mut chars: Vec<char> = Vec::new();
