@@ -172,7 +172,33 @@ mod tests {
             input: r#""hello""#.chars().collect(),
             pos: 0,
         };
-        let result = parser.parse_string().unwrap();
-        assert_eq!(result, "hello");
+        assert_eq!(parser.parse_string().unwrap(), "hello");
+    }
+
+    #[test]
+    fn test_parse_string_empty() {
+        let mut parser = Parser {
+            input: r#""""#.chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_string().unwrap(), "");
+    }
+
+    #[test]
+    fn test_parse_string_with_spaces() {
+        let mut parser = Parser {
+            input: r#""hello world""#.chars().collect(),
+            pos: 0,
+        };
+        assert_eq!(parser.parse_string().unwrap(), "hello world");
+    }
+
+    #[test]
+    fn test_parse_string_unclosed() {
+        let mut parser = Parser {
+            input: r#""hello"#.chars().collect(),
+            pos: 0,
+        };
+        assert!(parser.parse_string().is_err());
     }
 }
