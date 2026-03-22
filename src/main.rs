@@ -46,4 +46,50 @@ impl Parser {
             self.advance();
         }
     }
+
+    fn parse_value(&mut self) -> Result<JsonValue, String> {
+        self.skip_whitespace();
+        match self.peek() {
+            Some('"') => {
+                let s = self.parse_string()?;
+                Ok(JsonValue::Str(s))
+            }
+            Some('{') => self.parse_object(),
+            Some('[') => self.parse_array(),
+            Some('t') | Some('f') => self.parse_bool(),
+            Some('n') => self.parse_null(),
+            Some(c) if c.is_ascii_digit() || c == '-' => self.parse_number(),
+            _ => Err("Unexpected Character".to_string()),
+        }
+    }
+
+    fn parse_string(&mut self) -> Result<String, String> {
+        let mut chars: Vec<char> = Vec::new();
+        self.advance();
+        while let Some(c) = self.peek() {
+            if c == '"' {
+                self.advance();
+                return Ok(chars.iter().collect());
+            }
+            chars.push(c);
+            self.advance();
+        }
+        Err("String is not closed".to_string())
+    }
+
+    fn parse_object(&mut self) -> Result<JsonValue, String> {
+        todo!()
+    }
+    fn parse_array(&mut self) -> Result<JsonValue, String> {
+        todo!()
+    }
+    fn parse_bool(&mut self) -> Result<JsonValue, String> {
+        todo!()
+    }
+    fn parse_null(&mut self) -> Result<JsonValue, String> {
+        todo!()
+    }
+    fn parse_number(&mut self) -> Result<JsonValue, String> {
+        todo!()
+    }
 }
